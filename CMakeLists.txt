@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 
 project(VarjoDualCameraApplications
-    VERSION 0.1.0
+    VERSION 0.2.0
     LANGUAGES CXX
 )
 
@@ -16,10 +16,21 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 option(VDCA_BUILD_MF_FRAME_SYNC_TO_VARJO_PLANE
     "Build the MFFrameSource stereo synchronization to VarjoXR Plane application"
     ON)
+option(VDCA_BUILD_REALTIME_STEREO_CALIBRATION
+    "Build reusable online stereo calibration components and the live Varjo application"
+    ON)
 
 include(cmake/Dependencies.cmake)
 vdca_resolve_dependencies()
 
+if(VDCA_BUILD_REALTIME_STEREO_CALIBRATION)
+    add_subdirectory(libraries)
+endif()
+
 if(VDCA_BUILD_MF_FRAME_SYNC_TO_VARJO_PLANE)
     add_subdirectory(apps/MFFrameSyncToVarjoPlane)
+endif()
+
+if(VDCA_BUILD_REALTIME_STEREO_CALIBRATION)
+    add_subdirectory(apps/RealtimeStereoCalibration)
 endif()
