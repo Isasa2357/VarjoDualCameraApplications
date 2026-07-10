@@ -143,6 +143,7 @@ AppOptions ParseAppOptions(int argc, wchar_t** argv) {
         else if (arg == L"--min-corner-motion") o.minCornerMotionPx = Double(RequireValue(i, argc, argv));
         else if (arg == L"--ransac-threshold") o.ransacThresholdPx = Double(RequireValue(i, argc, argv));
         else if (arg == L"--no-fit-canvas") o.fitCanvas = false;
+        else if (arg == L"--sb") o.useChessboardSb = true;
         else if (arg == L"--no-sb") o.useChessboardSb = false;
         else if (arg == L"--initial-json") o.initialJson = RequireValue(i, argc, argv);
         else if (arg == L"--output-json") o.outputJson = RequireValue(i, argc, argv);
@@ -178,7 +179,8 @@ void PrintUsage(std::wostream& out) {
         << L"Calibration: [--profile uncalibrated|affine_vertical|affine_full]\n"
         << L"             [--initial-json PATH] [--output-json PATH]\n"
         << L"             [--max-observations N] [--min-observations N]\n"
-        << L"             [--min-corner-motion PX] [--ransac-threshold PX] [--no-fit-canvas] [--no-sb]\n"
+        << L"             [--min-corner-motion PX] [--ransac-threshold PX] [--no-fit-canvas]\n"
+        << L"             [--sb|--no-sb] (fast classic detector is the default)\n"
         << L"Plane: --plane-width M --plane-distance M --plane-y M --placement head|world\n"
         << L"Queues: --display-capture-queue N --calibration-capture-queue N\n"
         << L"        --display-sync-queue N --calibration-sync-queue N --sync-candidates N\n"
