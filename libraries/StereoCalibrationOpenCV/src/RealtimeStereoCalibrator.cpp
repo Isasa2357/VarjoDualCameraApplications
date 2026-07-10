@@ -65,6 +65,25 @@ struct RealtimeStereoCalibrator::Impl {
                 config.boardRows,
                 config.rightOrder,
                 config.activeProfile);
+
+            const double sx = static_cast<double>(config.rectifiedOutputSize.width) /
+                              static_cast<double>(config.processingInputSize.width);
+            const double sy = static_cast<double>(config.rectifiedOutputSize.height) /
+                              static_cast<double>(config.processingInputSize.height);
+            Homography3x3 forward;
+            forward.rows = {
+                sx, 0.0, 0.0,
+                0.0, sy, 0.0,
+                0.0, 0.0, 1.0,
+            };
+            const Homography3x3 inverse = InvertHomography(forward);
+            for (auto& [name, profile] : initial.profiles) {
+                (void)name;
+                profile.leftForward = forward;
+                profile.leftInverse = inverse;
+                profile.rightForward = forward;
+                profile.rightInverse = inverse;
+            }
         }
         store.publish(std::move(initial), config.activeProfile, false);
     }
