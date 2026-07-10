@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <future>
 #include <limits>
 #include <stdexcept>
 #include <utility>
@@ -12,20 +13,82 @@
 namespace Vdca::StereoCalibration::internal {
 namespace {
 
-bool DetectCorners(const cv::Mat& gray, cv::Size board, bool useSb, std::vector<cv::Point2f>& corners) {
-    if (useSb) {
-        const int flags = cv::CALIB_CB_EXHAUSTIVE | cv::CALIB_CB_ACCURACY;
-        if (cv::findChessboardCornersSB(gray, board, corners, flags)) return true;
-        corners.clear();
+struct DetectionImage {
+    cv::Mat gray;
+    double scale = 1.0;
+};
+
+DetectionImage PrepareDetectionImage(const cv::Mat& gray, std::uint32_t maxDimension) {
+    if (gray.empty()) throw std::invalid_argument("PrepareDetectionImage: empty image");
+    const int largest = std::max(gray.cols, gray.rows);
+    if (maxDimension == 0 || largest <= static_cast<int>(maxDimension)) {
+        return {gray, 1.0};
     }
-    const int flags = cv::CALIB_CB_ADAPTIVE_THRESH | cv::CALIB_CB_NORMALIZE_IMAGE;
-    if (!cv::findChessboardCorners(gray, board, corners, flags)) {
+
+    const double scale = static_cast<double>(maxDimension) / static_cast<double>(largest);
+    const int width = std::max(1, static_cast<int>(std::lround(gray.cols * scale)));
+    const int height = std::max(1, static_cast<int>(std::lround(gray.rows * scale)));
+    DetectionImage result;
+    result.scale = scale;
+    cv::resize(gray, result.gray, cv::Size(width, height), 0.0, 0.0, cv::INTER_AREA);
+    return result;
+}
+
+void RestoreFullResolution(std::vector<cv::Point2f>& corners, double scale) {
+    if (scale == 1.0) return;
+    const float inverse = static_cast<float>(1.0 / scale);
+    for (auto& point : corners) {
+        point.x *= inverse;
+        point.y *= inverse;
+    }
+}
+
+void RefineOnFullResolution(const cv::Mat& gray, std::vector<cv::Point2f>& corners) {
+    if (corners.empty()) return;
+    try {
+        cv::cornerSubPix(
+            gray,
+            corners,
+            cv::Size(5, 5),
+            cv::Size(-1, -1),
+            cv::TermCriteria(cv::TermCriteria::EPS | cv::TermCriteria::COUNT, 20, 1.0e-2));
+    } catch (const cv::Exception&) {
+        // The reduced-image detector already produced usable subpixel points.
+        // Keep them instead of rejecting the entire stereo observation.
+    }
+}
+
+bool DetectCorners(
+    const cv::Mat& fullGray,
+    cv::Size board,
+    bool useSb,
+    std::uint32_t maxDimension,
+    std::vector<cv::Point2f>& corners) {
+    const DetectionImage detection = PrepareDetectionImage(fullGray, maxDimension);
+
+    bool found = false;
+    if (useSb) {
+        // EXHAUSTIVE and ACCURACY are deliberately not enabled in the realtime
+        // path. They can make a negative detection take several seconds.
+        found = cv::findChessboardCornersSB(
+            detection.gray,
+            board,
+            corners,
+            cv::CALIB_CB_NORMALIZE_IMAGE);
+    } else {
+        const int flags = cv::CALIB_CB_ADAPTIVE_THRESH |
+                          cv::CALIB_CB_NORMALIZE_IMAGE |
+                          cv::CALIB_CB_FAST_CHECK;
+        found = cv::findChessboardCorners(detection.gray, board, corners, flags);
+    }
+
+    if (!found) {
         corners.clear();
         return false;
     }
-    cv::cornerSubPix(
-        gray, corners, cv::Size(11, 11), cv::Size(-1, -1),
-        cv::TermCriteria(cv::TermCriteria::EPS | cv::TermCriteria::COUNT, 40, 1.0e-4));
+
+    RestoreFullResolution(corners, detection.scale);
+    RefineOnFullResolution(fullGray, corners);
     return true;
 }
 
@@ -303,10 +366,30 @@ bool DetectObservation(
     std::uint32_t boardRows,
     const std::string& rightOrder,
     bool useFindChessboardCornersSB,
+    std::uint32_t detectionMaxDimension,
     Observation& output) {
     const cv::Size board(static_cast<int>(boardColumns), static_cast<int>(boardRows));
-    if (!DetectCorners(leftGray, board, useFindChessboardCornersSB, output.left) ||
-        !DetectCorners(rightGray, board, useFindChessboardCornersSB, output.right)) {
+
+    auto leftFuture = std::async(std::launch::async, [&] {
+        return DetectCorners(
+            leftGray,
+            board,
+            useFindChessboardCornersSB,
+            detectionMaxDimension,
+            output.left);
+    });
+    auto rightFuture = std::async(std::launch::async, [&] {
+        return DetectCorners(
+            rightGray,
+            board,
+            useFindChessboardCornersSB,
+            detectionMaxDimension,
+            output.right);
+    });
+
+    const bool leftFound = leftFuture.get();
+    const bool rightFound = rightFuture.get();
+    if (!leftFound || !rightFound) {
         output = {};
         return false;
     }
