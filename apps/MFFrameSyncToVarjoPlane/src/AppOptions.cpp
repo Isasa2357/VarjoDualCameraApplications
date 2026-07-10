@@ -70,11 +70,30 @@ float ParseFloat(const std::wstring& text, std::wstring_view option) {
     return value;
 }
 
+std::string ParseAscii(const std::wstring& text, std::wstring_view option) {
+    std::string result;
+    result.reserve(text.size());
+    for (const wchar_t c : text) {
+        if (c < 0 || c > 0x7f) {
+            throw std::invalid_argument("command-line value must contain ASCII characters only");
+        }
+        result.push_back(static_cast<char>(c));
+    }
+    (void)option;
+    return result;
+}
+
 std::wstring Uppercase(std::wstring text) {
     std::transform(text.begin(), text.end(), text.begin(), [](wchar_t c) {
         return static_cast<wchar_t>(std::towupper(c));
     });
     return text;
+}
+
+bool IsSupportedRectificationProfile(const std::string& profile) noexcept {
+    return profile == "uncalibrated" ||
+           profile == "affine_vertical" ||
+           profile == "affine_full";
 }
 
 void Validate(const AppOptions& options) {
@@ -105,6 +124,14 @@ void Validate(const AppOptions& options) {
     if (options.startupTimeoutMilliseconds == 0) {
         throw std::invalid_argument("startup timeout must be greater than zero");
     }
+    if (!options.rectificationProfile.empty() && options.rectificationPath.empty()) {
+        throw std::invalid_argument("--rectification-profile requires --rectification");
+    }
+    if (!options.rectificationProfile.empty() &&
+        !IsSupportedRectificationProfile(options.rectificationProfile)) {
+        throw std::invalid_argument(
+            "--rectification-profile must be uncalibrated, affine_vertical, or affine_full");
+    }
 }
 
 } // namespace
@@ -133,6 +160,10 @@ AppOptions ParseAppOptions(int argc, wchar_t** argv) {
             options.subtype = Uppercase(RequireValue(i, argc, argv, arg));
         } else if (arg == L"--shader-dir") {
             options.shaderDirectory = RequireValue(i, argc, argv, arg);
+        } else if (arg == L"--rectification") {
+            options.rectificationPath = RequireValue(i, argc, argv, arg);
+        } else if (arg == L"--rectification-profile") {
+            options.rectificationProfile = ParseAscii(RequireValue(i, argc, argv, arg), arg);
         } else if (arg == L"--sync-tolerance-us") {
             options.syncToleranceMicroseconds = ParseI64(RequireValue(i, argc, argv, arg), arg);
         } else if (arg == L"--capture-queue") {
@@ -180,12 +211,16 @@ void PrintUsage(std::wostream& out) {
         << L"Camera options (MFFrameSource exact native-format match):\n"
         << L"  --left INDEX                 Left camera index (default: 0)\n"
         << L"  --right INDEX                Right camera index (default: 1)\n"
-        << L"  --width PIXELS               Input/output width (default: 1920)\n"
-        << L"  --height PIXELS              Input/output height (default: 1080)\n"
+        << L"  --width PIXELS               Native camera width (default: 1920)\n"
+        << L"  --height PIXELS              Native camera height (default: 1080)\n"
         << L"  --fps-num N                  Frame-rate numerator (default: 60)\n"
         << L"  --fps-den N                  Frame-rate denominator (default: 1)\n"
         << L"  --subtype TYPE               NV12 | P010 | RGB32 | ARGB32\n"
         << L"  --shader-dir PATH            D3D12Processing shader directory\n\n"
+        << L"Stereo rectification options:\n"
+        << L"  --rectification PATH         vdca.stereo_rectification version 1 JSON\n"
+        << L"  --rectification-profile NAME uncalibrated | affine_vertical | affine_full\n"
+        << L"                               Omit NAME to use JSON default_profile\n\n"
         << L"Synchronization options:\n"
         << L"  --sync-tolerance-us N        Maximum adjusted timestamp difference (default: 5000)\n"
         << L"  --capture-queue N            Per-camera queue capacity (default: 4)\n"
