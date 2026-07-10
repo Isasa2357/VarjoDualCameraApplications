@@ -164,9 +164,18 @@ AppOptions ParseAppOptions(int argc, wchar_t** argv) {
         }
         else if (arg == L"--startup-timeout-ms") o.startupTimeoutMilliseconds = U32(RequireValue(i, argc, argv));
         else if (arg == L"--log-every") o.logEveryFrames = U32(RequireValue(i, argc, argv));
+        else if (arg == L"--d3d-debug") o.enableD3dDebugLayer = true;
         else if (arg == L"--no-d3d-debug") o.enableD3dDebugLayer = false;
         else throw std::invalid_argument("unknown command-line option");
     }
+
+    // Without an initial document, start from the stable vertical-only profile.
+    // When --initial-json is supplied and --profile is omitted, the document's
+    // default_profile remains authoritative.
+    if (!o.showHelp && o.activeProfile.empty() && o.initialJson.empty()) {
+        o.activeProfile = "affine_vertical";
+    }
+
     if (!o.showHelp) Validate(o);
     return o;
 }
@@ -177,15 +186,17 @@ void PrintUsage(std::wostream& out) {
         << L"Processing: [--processing-width W --processing-height H] [--output-width W --output-height H]\n"
         << L"Checkerboard: --board-cols N --board-rows N [--right-order same|flip_x|flip_y|rot180]\n"
         << L"Calibration: [--profile uncalibrated|affine_vertical|affine_full]\n"
+        << L"             (default without --initial-json: affine_vertical)\n"
         << L"             [--initial-json PATH] [--output-json PATH]\n"
         << L"             [--max-observations N] [--min-observations N]\n"
+        << L"             (defaults: max=30, min=8, min-corner-motion=15px)\n"
         << L"             [--min-corner-motion PX] [--ransac-threshold PX] [--no-fit-canvas]\n"
         << L"             [--sb|--no-sb] (fast classic detector is the default)\n"
         << L"Plane: --plane-width M --plane-distance M --plane-y M --placement head|world\n"
         << L"Queues: --display-capture-queue N --calibration-capture-queue N\n"
         << L"        --display-sync-queue N --calibration-sync-queue N --sync-candidates N\n"
         << L"Other: --shader-dir PATH --sync-tolerance-us N --startup-timeout-ms N --log-every N\n"
-        << L"       --no-d3d-debug --help\n\n"
+        << L"       [--d3d-debug|--no-d3d-debug] (disabled by default) --help\n\n"
         << L"Press Esc or Ctrl+C to exit.\n";
 }
 
