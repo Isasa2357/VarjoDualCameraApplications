@@ -54,6 +54,13 @@ StereoPlaneSurface::StereoPlaneSurface(
     if (!(desc.planeWidthMeters > 0.0f) || !(desc.planeDistanceMeters > 0.0f)) {
         throw std::invalid_argument("StereoPlaneSurface: plane width and distance must be positive");
     }
+    if ((desc.contentWidth == 0) != (desc.contentHeight == 0)) {
+        throw std::invalid_argument(
+            "StereoPlaneSurface: contentWidth and contentHeight must both be zero or both be non-zero");
+    }
+
+    const std::uint32_t contentWidth = desc.contentWidth != 0 ? desc.contentWidth : width_;
+    const std::uint32_t contentHeight = desc.contentHeight != 0 ? desc.contentHeight : height_;
 
     copyContext_ = core_->CreateDirectContext();
     copyFence_.Initialize(core_->GetDevice());
@@ -65,7 +72,7 @@ StereoPlaneSurface::StereoPlaneSurface(
     leftXrTexture_ = backend.wrapResource(leftDisplayTexture_.Get(), format_);
     rightXrTexture_ = backend.wrapResource(rightDisplayTexture_.Get(), format_);
 
-    const float aspect = static_cast<float>(height_) / static_cast<float>(width_);
+    const float aspect = static_cast<float>(contentHeight) / static_cast<float>(contentWidth);
     plane_ = &space.createPlane({desc.planeWidthMeters, desc.planeWidthMeters * aspect});
     plane_->setPlacementMode(desc.placementMode);
     plane_->transform().position = {
