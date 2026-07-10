@@ -1,6 +1,7 @@
 #include <VdcaStereoCalibration/D3D12StereoFrame.hpp>
 
 #include <stdexcept>
+#include <utility>
 
 namespace Vdca::StereoCalibration {
 
