@@ -15,9 +15,16 @@
 namespace Vdca {
 
 struct StereoPlaneSurfaceDesc {
+    // Stable application-owned source texture size. This must match the
+    // synchronized MFFrameSource output frames.
     std::uint32_t width = 0;
     std::uint32_t height = 0;
     DXGI_FORMAT format = DXGI_FORMAT_UNKNOWN;
+
+    // Content size after optional Plane processing. Zero selects width/height.
+    // This is used for the physical Plane aspect ratio.
+    std::uint32_t contentWidth = 0;
+    std::uint32_t contentHeight = 0;
 
     float planeWidthMeters = 1.0f;
     float planeDistanceMeters = 1.0f;
@@ -28,9 +35,9 @@ struct StereoPlaneSurfaceDesc {
 // Owns stable per-eye textures used by VarjoXR. Synchronized MFFrameSource
 // textures are copied into these resources on the same D3D12 direct queue.
 //
-// Keeping this bridge separate from XRPlane processing is intentional:
-// future stereo calibration/remap belongs in XRPlane per-eye processing, while
-// this class remains responsible only for lifetime-safe frame transport.
+// Frame transport remains separate from XRPlane processing. Stereo
+// rectification/remap is configured as per-eye Plane processing while this
+// class remains responsible for lifetime-safe synchronized frame transport.
 class StereoPlaneSurface {
 public:
     StereoPlaneSurface(
