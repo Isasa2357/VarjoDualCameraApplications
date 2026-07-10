@@ -184,7 +184,15 @@ void StereoPlaneSurface::setProcessing(
     if (!plane_) {
         throw std::runtime_error("StereoPlaneSurface: plane is not initialized");
     }
-    plane_->setProcessing(eye, processing);
+
+    // This class alternates two XRTexture identities whenever a new synchronized
+    // camera frame is copied. OnTextureChanged therefore means once per new
+    // camera frame, while avoiding duplicate work for Varjo's multiple views.
+    auto effectiveProcessing = processing;
+    if (effectiveProcessing.enabled) {
+        effectiveProcessing.timing = VarjoXR::ProcessingTiming::OnTextureChanged;
+    }
+    plane_->setProcessing(eye, effectiveProcessing);
 }
 
 } // namespace Vdca
