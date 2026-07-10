@@ -159,6 +159,7 @@ struct RealtimeStereoCalibrator::Impl {
                 config.boardRows,
                 config.rightOrder,
                 config.useFindChessboardCornersSB,
+                config.checkerboardDetectionMaxDimension,
                 observation)) {
             checkerboardMisses.fetch_add(1);
             return;
