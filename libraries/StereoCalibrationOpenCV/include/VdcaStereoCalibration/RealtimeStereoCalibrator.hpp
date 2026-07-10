@@ -32,7 +32,14 @@ struct RealtimeStereoCalibratorConfig {
     double minMeanCornerMotionPx = 2.0;
     double fundamentalRansacThresholdPx = 1.5;
     bool fitUncalibratedResultToCanvas = true;
-    bool useFindChessboardCornersSB = true;
+
+    // The fast classic detector is the realtime default. SB remains available
+    // for difficult boards, but is intentionally opt-in because it is slower.
+    bool useFindChessboardCornersSB = false;
+
+    // Detection is performed on a temporary reduced image while the displayed
+    // and calibrated image keeps its original resolution. 0 disables scaling.
+    std::uint32_t checkerboardDetectionMaxDimension = 960;
 
     std::array<float, 4> borderRgba{0.0f, 0.0f, 0.0f, 1.0f};
     std::optional<CalibrationDocument> initialCalibration;
