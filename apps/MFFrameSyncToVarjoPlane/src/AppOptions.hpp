@@ -25,6 +25,9 @@ struct AppOptions {
 
     std::filesystem::path shaderDirectory;
 
+    std::filesystem::path rectificationPath;
+    std::string rectificationProfile;
+
     std::int64_t syncToleranceMicroseconds = 5000;
     std::size_t captureQueueCapacity = 4;
     std::size_t syncCandidateCapacity = 16;
