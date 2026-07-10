@@ -7,7 +7,6 @@
 #include <Windows.h>
 
 #include <cstddef>
-#include <cstring>
 #include <stdexcept>
 #include <utility>
 
@@ -129,19 +128,21 @@ void StereoGpuReadback::recordCopy(
 cv::Mat StereoGpuReadback::mapGray(
     D3D12CoreLib::D3D12ReadbackBuffer& buffer,
     DXGI_FORMAT format) {
-    cv::Mat rgba(static_cast<int>(height_), static_cast<int>(width_), CV_8UC4);
     auto mapped = buffer.MapRead(layout_.footprint.Offset, layout_.totalBytes - layout_.footprint.Offset);
     if (!mapped) throw std::runtime_error("StereoGpuReadback: MapRead returned empty range");
-    const auto* base = reinterpret_cast<const std::uint8_t*>(mapped.Data());
-    for (std::uint32_t y = 0; y < height_; ++y) {
-        std::memcpy(
-            rgba.ptr(static_cast<int>(y)),
-            base + static_cast<std::size_t>(y) * layout_.footprint.Footprint.RowPitch,
-            static_cast<std::size_t>(width_) * 4u);
-    }
+
+    auto* base = const_cast<std::byte*>(mapped.Data());
+    cv::Mat color(
+        static_cast<int>(height_),
+        static_cast<int>(width_),
+        CV_8UC4,
+        base,
+        static_cast<std::size_t>(layout_.footprint.Footprint.RowPitch));
 
     cv::Mat gray;
-    cv::cvtColor(rgba, gray,
+    cv::cvtColor(
+        color,
+        gray,
         format == DXGI_FORMAT_R8G8B8A8_UNORM ? cv::COLOR_RGBA2GRAY : cv::COLOR_BGRA2GRAY);
     return gray;
 }
