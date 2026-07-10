@@ -9,6 +9,8 @@
 
 #include <VarjoXR/VarjoXR.hpp>
 
+#include <array>
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 
@@ -35,9 +37,9 @@ struct StereoPlaneSurfaceDesc {
 // Owns stable per-eye textures used by VarjoXR. Synchronized MFFrameSource
 // textures are copied into these resources on the same D3D12 direct queue.
 //
-// Frame transport remains separate from XRPlane processing. Stereo
-// rectification/remap is configured as per-eye Plane processing while this
-// class remains responsible for lifetime-safe synchronized frame transport.
+// Two XRTexture wrappers per eye alternate after every new synchronized frame.
+// With ProcessingTiming::OnTextureChanged this causes one processing dispatch
+// per eye and new camera frame, instead of one dispatch for every Varjo view.
 class StereoPlaneSurface {
 public:
     StereoPlaneSurface(
@@ -62,16 +64,22 @@ public:
     std::int64_t lastAdjustedDiff100ns() const noexcept { return lastAdjustedDiff100ns_; }
 
 private:
+    static constexpr std::size_t kTextureVariantCount = 2;
+
     void validateFrame(const MFFrameSource::MFD3D12CameraFrame& frame, const char* eyeName) const;
     void waitForPreviousCopy();
+    void activateNextTextureVariant();
 
     std::shared_ptr<D3D12CoreLib::D3D12Core> core_;
     D3D12CoreLib::D3D12CommandContext copyContext_;
     D3D12CoreLib::D3D12Fence copyFence_;
     D3D12CoreLib::D3D12Resource leftDisplayTexture_;
     D3D12CoreLib::D3D12Resource rightDisplayTexture_;
-    std::shared_ptr<VarjoXR::Backends::D3D12::D3D12Texture> leftXrTexture_;
-    std::shared_ptr<VarjoXR::Backends::D3D12::D3D12Texture> rightXrTexture_;
+    std::array<std::shared_ptr<VarjoXR::Backends::D3D12::D3D12Texture>, kTextureVariantCount>
+        leftXrTextures_{};
+    std::array<std::shared_ptr<VarjoXR::Backends::D3D12::D3D12Texture>, kTextureVariantCount>
+        rightXrTextures_{};
+    std::size_t activeTextureVariant_ = 0;
     VarjoXR::XRPlane* plane_ = nullptr;
 
     std::uint32_t width_ = 0;
