@@ -1,0 +1,30 @@
+# CMake / Visual Studio
+out/
+build/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+*.sln
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+.vs/
+
+# Compiled output
+*.exe
+*.dll
+*.lib
+*.pdb
+*.obj
+*.ilk
+
+# Local configuration
+CMakeUserPresets.json
+.vscode/
+.idea/
+
+# Logs and captures
+*.log
+*.csv
+*.mp4
+*.avi
