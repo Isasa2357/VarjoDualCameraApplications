@@ -33,7 +33,7 @@ struct AppOptions {
     double minCornerMotionPx = 2.0;
     double ransacThresholdPx = 1.5;
     bool fitCanvas = true;
-    bool useChessboardSb = true;
+    bool useChessboardSb = false;
 
     std::filesystem::path initialJson;
     std::filesystem::path outputJson;
