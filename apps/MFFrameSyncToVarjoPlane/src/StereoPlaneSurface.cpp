@@ -69,8 +69,10 @@ StereoPlaneSurface::StereoPlaneSurface(
     rightDisplayTexture_ = D3D12CoreLib::CreateTexture2D(
         *core_, width_, height_, format_, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
 
-    leftXrTexture_ = backend.wrapResource(leftDisplayTexture_.Get(), format_);
-    rightXrTexture_ = backend.wrapResource(rightDisplayTexture_.Get(), format_);
+    for (std::size_t i = 0; i < kTextureVariantCount; ++i) {
+        leftXrTextures_[i] = backend.wrapResource(leftDisplayTexture_.Get(), format_);
+        rightXrTextures_[i] = backend.wrapResource(rightDisplayTexture_.Get(), format_);
+    }
 
     const float aspect = static_cast<float>(contentHeight) / static_cast<float>(contentWidth);
     plane_ = &space.createPlane({desc.planeWidthMeters, desc.planeWidthMeters * aspect});
@@ -80,8 +82,8 @@ StereoPlaneSurface::StereoPlaneSurface(
         desc.planeVerticalOffsetMeters,
         -desc.planeDistanceMeters,
     };
-    plane_->setTexture(VarjoXR::Eye::Left, leftXrTexture_);
-    plane_->setTexture(VarjoXR::Eye::Right, rightXrTexture_);
+    plane_->setTexture(VarjoXR::Eye::Left, leftXrTextures_[activeTextureVariant_]);
+    plane_->setTexture(VarjoXR::Eye::Right, rightXrTextures_[activeTextureVariant_]);
 }
 
 StereoPlaneSurface::~StereoPlaneSurface() {
@@ -117,6 +119,15 @@ void StereoPlaneSurface::waitForPreviousCopy() {
         copyFence_.Wait(previousCopyFenceValue_);
         previousCopyFenceValue_ = 0;
     }
+}
+
+void StereoPlaneSurface::activateNextTextureVariant() {
+    if (!plane_) {
+        throw std::runtime_error("StereoPlaneSurface: plane is not initialized");
+    }
+    activeTextureVariant_ = (activeTextureVariant_ + 1) % kTextureVariantCount;
+    plane_->setTexture(VarjoXR::Eye::Left, leftXrTextures_[activeTextureVariant_]);
+    plane_->setTexture(VarjoXR::Eye::Right, rightXrTextures_[activeTextureVariant_]);
 }
 
 void StereoPlaneSurface::updateFromSynchronizedFrame(
@@ -156,6 +167,12 @@ void StereoPlaneSurface::updateFromSynchronizedFrame(
     ID3D12CommandList* commandLists[] = {copyContext_.GetCommandList()};
     core_->DirectQueue().ExecuteCommandLists(1, commandLists);
     previousCopyFenceValue_ = copyFence_.Signal(core_->GetDirectCommandQueue());
+
+    // Alternate the XRTexture identity only after the new copy has been queued.
+    // The underlying D3D12 resource remains stable. VarjoXR OnTextureChanged
+    // processing therefore dispatches once for this new camera frame and skips
+    // duplicate dispatches for the second Varjo view of the same eye.
+    activateNextTextureVariant();
 
     lastPairNumber_ = frame.pairNumber;
     lastAdjustedDiff100ns_ = frame.adjustedDiff100ns;
