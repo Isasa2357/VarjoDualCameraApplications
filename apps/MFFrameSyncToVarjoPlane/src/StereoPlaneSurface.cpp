@@ -56,6 +56,7 @@ StereoPlaneSurface::StereoPlaneSurface(
     }
 
     copyContext_ = core_->CreateDirectContext();
+    copyFence_.Initialize(core_->GetDevice());
     leftDisplayTexture_ = D3D12CoreLib::CreateTexture2D(
         *core_, width_, height_, format_, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
     rightDisplayTexture_ = D3D12CoreLib::CreateTexture2D(
@@ -106,7 +107,7 @@ void StereoPlaneSurface::validateFrame(
 
 void StereoPlaneSurface::waitForPreviousCopy() {
     if (previousCopyFenceValue_ != 0 && core_) {
-        core_->DirectQueue().WaitForFenceValue(previousCopyFenceValue_);
+        copyFence_.Wait(previousCopyFenceValue_);
         previousCopyFenceValue_ = 0;
     }
 }
@@ -147,7 +148,7 @@ void StereoPlaneSurface::updateFromSynchronizedFrame(
     copyContext_.Close();
     ID3D12CommandList* commandLists[] = {copyContext_.GetCommandList()};
     core_->DirectQueue().ExecuteCommandLists(1, commandLists);
-    previousCopyFenceValue_ = core_->DirectQueue().Signal();
+    previousCopyFenceValue_ = copyFence_.Signal(core_->GetDirectCommandQueue());
 
     lastPairNumber_ = frame.pairNumber;
     lastAdjustedDiff100ns_ = frame.adjustedDiff100ns;
