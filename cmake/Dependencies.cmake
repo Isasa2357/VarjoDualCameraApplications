@@ -7,6 +7,7 @@ set(D3D12HELPER_ROOT "" CACHE PATH "Optional local D3D12Helper repository root")
 set(VARJOXR_ROOT "" CACHE PATH "Optional local VarjoXR repository root")
 set(MFFRAMESOURCE_ROOT "" CACHE PATH "Optional local MFFrameSource repository root")
 set(THREADKIT_ROOT "" CACHE PATH "Optional local ThreadKit repository root forwarded to MFFrameSource")
+set(NLOHMANN_JSON_ROOT "" CACHE PATH "Optional local nlohmann/json repository root")
 
 set(VDCA_D3D12HELPER_GIT_REPOSITORY
     "https://github.com/Isasa2357/D3D12Helper.git"
@@ -28,6 +29,13 @@ set(VDCA_MFFRAMESOURCE_GIT_REPOSITORY
 set(VDCA_MFFRAMESOURCE_GIT_TAG
     "main"
     CACHE STRING "MFFrameSource Git ref/tag/commit")
+
+set(VDCA_NLOHMANN_JSON_GIT_REPOSITORY
+    "https://github.com/nlohmann/json.git"
+    CACHE STRING "nlohmann/json Git repository")
+set(VDCA_NLOHMANN_JSON_GIT_TAG
+    "v3.11.3"
+    CACHE STRING "nlohmann/json Git ref/tag/commit")
 
 function(vdca_resolve_d3d12helper)
     if(TARGET D3D12Helper::D3D12Helper)
@@ -108,15 +116,45 @@ function(vdca_resolve_mfframesource)
     endif()
 endfunction()
 
+function(vdca_resolve_nlohmann_json)
+    if(TARGET nlohmann_json::nlohmann_json)
+        return()
+    endif()
+
+    find_package(nlohmann_json 3.11.3 CONFIG QUIET)
+    if(TARGET nlohmann_json::nlohmann_json)
+        return()
+    endif()
+
+    set(JSON_BuildTests OFF CACHE BOOL "" FORCE)
+    set(JSON_Install OFF CACHE BOOL "" FORCE)
+
+    if(NLOHMANN_JSON_ROOT AND EXISTS "${NLOHMANN_JSON_ROOT}/CMakeLists.txt")
+        message(STATUS "VDCA: using local nlohmann/json: ${NLOHMANN_JSON_ROOT}")
+        add_subdirectory(
+            "${NLOHMANN_JSON_ROOT}"
+            "${CMAKE_BINARY_DIR}/_deps/nlohmann-json-build")
+    else()
+        FetchContent_Declare(
+            VDCA_nlohmann_json
+            GIT_REPOSITORY "${VDCA_NLOHMANN_JSON_GIT_REPOSITORY}"
+            GIT_TAG        "${VDCA_NLOHMANN_JSON_GIT_TAG}"
+            GIT_SHALLOW    TRUE)
+        FetchContent_MakeAvailable(VDCA_nlohmann_json)
+    endif()
+endfunction()
+
 function(vdca_resolve_dependencies)
     vdca_resolve_d3d12helper()
     vdca_resolve_varjoxr()
     vdca_resolve_mfframesource()
+    vdca_resolve_nlohmann_json()
 
     foreach(required_target IN ITEMS
         D3D12Helper::D3D12Helper
         VarjoXR::VarjoXR
-        MFFrameSource::D3D12)
+        MFFrameSource::D3D12
+        nlohmann_json::nlohmann_json)
         if(NOT TARGET ${required_target})
             message(FATAL_ERROR "VDCA: required target was not created: ${required_target}")
         endif()
