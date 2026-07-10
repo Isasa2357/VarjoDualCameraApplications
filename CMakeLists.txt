@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 
 project(VarjoDualCameraApplications
-    VERSION 0.2.0
+    VERSION 0.2.1
     LANGUAGES CXX
 )
 
@@ -18,7 +18,7 @@ option(VDCA_BUILD_MF_FRAME_SYNC_TO_VARJO_PLANE
     ON)
 option(VDCA_BUILD_REALTIME_STEREO_CALIBRATION
     "Build reusable online stereo calibration components and the live Varjo application"
-    ON)
+    OFF)
 
 include(cmake/Dependencies.cmake)
 vdca_resolve_dependencies()
