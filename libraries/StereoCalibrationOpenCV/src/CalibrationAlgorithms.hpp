@@ -24,6 +24,7 @@ bool DetectObservation(
     std::uint32_t boardRows,
     const std::string& rightOrder,
     bool useFindChessboardCornersSB,
+    std::uint32_t detectionMaxDimension,
     Observation& output);
 
 double MeanCornerMotion(const Observation& a, const Observation& b);
