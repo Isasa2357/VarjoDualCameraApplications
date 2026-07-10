@@ -1,5 +1,6 @@
 #include "AppOptions.hpp"
 #include "StereoPlaneSurface.hpp"
+#include "StereoRectification.hpp"
 
 #include <MFFrameSource/MFD3D12CameraCaptureThread.hpp>
 #include <MFFrameSource/MFD3D12CameraSyncThread.hpp>
@@ -21,8 +22,10 @@
 #include <iomanip>
 #include <iostream>
 #include <memory>
+#include <optional>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 #include <utility>
 
 namespace {
@@ -49,6 +52,34 @@ void LogInfo(const std::wstring& message) {
 
 void LogError(const std::wstring& message) {
     std::wcerr << L"[ERROR] " << message << L'\n';
+}
+
+std::wstring Utf8ToWide(std::string_view text) {
+    if (text.empty()) {
+        return {};
+    }
+    const int required = MultiByteToWideChar(
+        CP_UTF8,
+        MB_ERR_INVALID_CHARS,
+        text.data(),
+        static_cast<int>(text.size()),
+        nullptr,
+        0);
+    if (required <= 0) {
+        throw std::runtime_error("failed to convert UTF-8 text to UTF-16");
+    }
+    std::wstring result(static_cast<std::size_t>(required), L'\0');
+    const int written = MultiByteToWideChar(
+        CP_UTF8,
+        MB_ERR_INVALID_CHARS,
+        text.data(),
+        static_cast<int>(text.size()),
+        result.data(),
+        required);
+    if (written != required) {
+        throw std::runtime_error("failed to convert UTF-8 text to UTF-16");
+    }
+    return result;
 }
 
 std::filesystem::path ExecutableDirectory() {
@@ -89,7 +120,9 @@ GUID ParseSubtype(const std::wstring& subtype) {
 MFFrameSource::MFD3D12CameraCaptureThreadConfig MakeCaptureConfig(
     int cameraIndex,
     const Vdca::AppOptions& options,
-    const std::filesystem::path& shaderDirectory) {
+    const std::filesystem::path& shaderDirectory,
+    std::uint32_t outputWidth,
+    std::uint32_t outputHeight) {
     MFFrameSource::MFD3D12CameraCaptureThreadConfig config;
     config.selector.deviceIndex = cameraIndex;
     config.capture.input.width = options.width;
@@ -97,8 +130,8 @@ MFFrameSource::MFD3D12CameraCaptureThreadConfig MakeCaptureConfig(
     config.capture.input.fps.numerator = options.fpsNumerator;
     config.capture.input.fps.denominator = options.fpsDenominator;
     config.capture.input.subtype = ParseSubtype(options.subtype);
-    config.capture.outputWidth = options.width;
-    config.capture.outputHeight = options.height;
+    config.capture.outputWidth = outputWidth;
+    config.capture.outputHeight = outputHeight;
     config.capture.outputFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
     config.capture.processingShaderDirectory = shaderDirectory.wstring();
     config.capture.framePoolSize = 4;
@@ -208,6 +241,36 @@ int wmain(int argc, wchar_t** argv) {
             return 0;
         }
 
+        std::optional<Vdca::StereoRectificationProfile> rectification;
+        std::uint32_t processingInputWidth = options.width;
+        std::uint32_t processingInputHeight = options.height;
+        if (!options.rectificationPath.empty()) {
+            const auto absolutePath = std::filesystem::absolute(options.rectificationPath);
+            rectification = Vdca::LoadStereoRectificationProfile(
+                absolutePath,
+                options.rectificationProfile);
+            rectification->validateCameraInputSize(options.width, options.height);
+            processingInputWidth = rectification->calibrationInputSize.width;
+            processingInputHeight = rectification->calibrationInputSize.height;
+
+            LogInfo(L"rectification JSON: " + absolutePath.wstring());
+            LogInfo(
+                L"rectification profile: " + Utf8ToWide(rectification->profileName) +
+                L" (method=" + Utf8ToWide(rectification->method) + L")");
+            LogInfo(
+                L"rectification geometry: native " +
+                std::to_wstring(rectification->sourceSize.width) + L"x" +
+                std::to_wstring(rectification->sourceSize.height) +
+                L" -> processing input " +
+                std::to_wstring(rectification->calibrationInputSize.width) + L"x" +
+                std::to_wstring(rectification->calibrationInputSize.height) +
+                L" -> rectified output " +
+                std::to_wstring(rectification->rectifiedOutputSize.width) + L"x" +
+                std::to_wstring(rectification->rectifiedOutputSize.height));
+        } else {
+            LogInfo(L"stereo rectification disabled");
+        }
+
         SetConsoleCtrlHandler(ConsoleControlHandler, TRUE);
         LogInfo(L"initializing Media Foundation, D3D12, and VarjoXR");
 
@@ -245,8 +308,18 @@ int wmain(int argc, wchar_t** argv) {
         MFFrameSource::MFD3D12CameraSyncThread sync;
         CaptureStopGuard stopGuard(leftCapture, rightCapture, sync);
 
-        const auto leftConfig = MakeCaptureConfig(options.leftCameraIndex, options, shaderDirectory);
-        const auto rightConfig = MakeCaptureConfig(options.rightCameraIndex, options, shaderDirectory);
+        const auto leftConfig = MakeCaptureConfig(
+            options.leftCameraIndex,
+            options,
+            shaderDirectory,
+            processingInputWidth,
+            processingInputHeight);
+        const auto rightConfig = MakeCaptureConfig(
+            options.rightCameraIndex,
+            options,
+            shaderDirectory,
+            processingInputWidth,
+            processingInputHeight);
 
         LogInfo(L"opening left camera index " + std::to_wstring(options.leftCameraIndex));
         if (!leftCapture.open(leftConfig, core)) {
@@ -292,11 +365,20 @@ int wmain(int argc, wchar_t** argv) {
             firstFrame->left.format() != firstFrame->right.format()) {
             throw std::runtime_error("left/right synchronized frame formats do not match");
         }
+        if (rectification) {
+            rectification->validateProcessingInputSize(
+                firstFrame->left.width(),
+                firstFrame->left.height());
+        }
 
         Vdca::StereoPlaneSurfaceDesc surfaceDesc;
         surfaceDesc.width = firstFrame->left.width();
         surfaceDesc.height = firstFrame->left.height();
         surfaceDesc.format = firstFrame->left.format();
+        if (rectification) {
+            surfaceDesc.contentWidth = rectification->rectifiedOutputSize.width;
+            surfaceDesc.contentHeight = rectification->rectifiedOutputSize.height;
+        }
         surfaceDesc.planeWidthMeters = options.planeWidthMeters;
         surfaceDesc.planeDistanceMeters = options.planeDistanceMeters;
         surfaceDesc.planeVerticalOffsetMeters = options.planeVerticalOffsetMeters;
@@ -305,11 +387,16 @@ int wmain(int argc, wchar_t** argv) {
             : VarjoXR::PlacementMode::World;
 
         Vdca::StereoPlaneSurface surface(core, d3d12Backend, space, surfaceDesc);
+        if (rectification) {
+            surface.setProcessing(
+                VarjoXR::Eye::Left,
+                rectification->makeProcessing(VarjoXR::Eye::Left));
+            surface.setProcessing(
+                VarjoXR::Eye::Right,
+                rectification->makeProcessing(VarjoXR::Eye::Right));
+            LogInfo(L"per-eye stereo rectification processing enabled");
+        }
 
-        // Future calibration integration point:
-        //   surface.setProcessing(VarjoXR::Eye::Left, leftRemapProcessing);
-        //   surface.setProcessing(VarjoXR::Eye::Right, rightRemapProcessing);
-        // The capture/sync/copy path remains unchanged.
         surface.updateFromSynchronizedFrame(*firstFrame);
         firstFrame.reset();
 
