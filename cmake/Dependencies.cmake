@@ -20,7 +20,7 @@ set(VDCA_D3D12HELPER_GIT_REPOSITORY
     "https://github.com/Isasa2357/D3D12Helper.git"
     CACHE STRING "D3D12Helper Git repository")
 set(VDCA_D3D12HELPER_GIT_TAG
-    "main"
+    "v1.13.0"
     CACHE STRING "D3D12Helper Git ref/tag/commit")
 
 set(VDCA_VARJOXR_GIT_REPOSITORY
