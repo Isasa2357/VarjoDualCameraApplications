@@ -1,0 +1,3 @@
+add_subdirectory(StereoCalibrationCore)
+add_subdirectory(VarjoStereoView)
+add_subdirectory(StereoCalibrationOpenCV)
