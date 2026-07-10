@@ -33,6 +33,19 @@ Left/Right MFD3D12CameraCaptureThread
 
 同じ姿勢を過剰に重複登録しないよう、直前の採用観測との平均コーナー移動量を確認します。
 
+## Stable defaults
+
+実機確認で安定した次の設定を既定値としています。
+
+- JSON未指定時のprofile: `affine_vertical`
+- 最大観測数: 30
+- 表示へ反映を開始する最小観測数: 8
+- 新しい観測として採用する最小平均コーナー移動量: 15px
+- チェッカーボード検出: 高速な通常検出
+- D3D12 debug layer: 無効
+
+`--initial-json` を指定し、`--profile` を省略した場合は、既存JSONの `default_profile` を優先します。SB検出を使う場合は `--sb`、D3D12 debug layerを有効にする場合は `--d3d-debug` を指定します。
+
 ## Live display
 
 起動時は次のいずれかを初期値として表示します。
@@ -72,15 +85,13 @@ RealtimeStereoCalibration.exe ^
   --subtype NV12 ^
   --board-cols 12 ^
   --board-rows 9 ^
-  --profile uncalibrated ^
-  --initial-json C:\calibration\previous.json ^
   --output-json C:\calibration\current.json ^
   --plane-width 1.0 ^
   --plane-distance 1.0 ^
   --placement head
 ```
 
-初期JSONを使わない場合は `--initial-json` を省略します。
+初期JSONを使う場合は `--initial-json` を追加します。profile、観測数、通常チェッカーボード検出、D3Dデバッグ設定は、上記の安定した既定値が使われます。
 
 カメラnativeサイズと解析サイズを分ける場合:
 
