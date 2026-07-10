@@ -11,6 +11,7 @@
 #include <VarjoXR/VarjoXR.hpp>
 
 #include <array>
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 
