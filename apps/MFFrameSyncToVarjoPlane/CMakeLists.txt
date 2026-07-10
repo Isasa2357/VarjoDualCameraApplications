@@ -5,6 +5,8 @@ add_executable(${target_name}
     src/AppOptions.hpp
     src/StereoPlaneSurface.cpp
     src/StereoPlaneSurface.hpp
+    src/StereoRectification.cpp
+    src/StereoRectification.hpp
     src/main.cpp
 )
 
@@ -15,6 +17,7 @@ target_link_libraries(${target_name}
         MFFrameSource::D3D12
         VarjoXR::VarjoXR
         D3D12Helper::D3D12Helper
+        nlohmann_json::nlohmann_json
 )
 
 target_compile_definitions(${target_name}
@@ -32,6 +35,8 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}/src" PREFIX "Source" FILES
     src/AppOptions.hpp
     src/StereoPlaneSurface.cpp
     src/StereoPlaneSurface.hpp
+    src/StereoRectification.cpp
+    src/StereoRectification.hpp
     src/main.cpp)
 
 if(COMMAND varjoxr_copy_varjo_runtime)
