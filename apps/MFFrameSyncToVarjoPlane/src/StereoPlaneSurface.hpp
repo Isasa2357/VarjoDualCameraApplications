@@ -4,6 +4,7 @@
 
 #include <D3D12Helper/D3D12Core/D3D12CommandContext.hpp>
 #include <D3D12Helper/D3D12Core/D3D12Core.hpp>
+#include <D3D12Helper/D3D12Core/D3D12Fence.hpp>
 #include <D3D12Helper/D3D12Framework/D3D12Resource.hpp>
 
 #include <VarjoXR/VarjoXR.hpp>
@@ -59,6 +60,7 @@ private:
 
     std::shared_ptr<D3D12CoreLib::D3D12Core> core_;
     D3D12CoreLib::D3D12CommandContext copyContext_;
+    D3D12CoreLib::D3D12Fence copyFence_;
     D3D12CoreLib::D3D12Resource leftDisplayTexture_;
     D3D12CoreLib::D3D12Resource rightDisplayTexture_;
     std::shared_ptr<VarjoXR::Backends::D3D12::D3D12Texture> leftXrTexture_;
