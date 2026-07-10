@@ -1,5 +1,12 @@
 include(FetchContent)
 
+# This repository consumes dependencies as source subprojects and does not
+# generate install packages. Some dependencies export external targets from
+# install(EXPORT), which fails when those targets are provided by sibling
+# FetchContent projects. Disable install-rule generation for the superbuild.
+set(CMAKE_SKIP_INSTALL_RULES ON CACHE BOOL
+    "Disable install rules for the VarjoDualCameraApplications superbuild" FORCE)
+
 set(FETCHCONTENT_UPDATES_DISCONNECTED ON CACHE BOOL
     "Do not update already-populated FetchContent dependencies automatically" FORCE)
 
